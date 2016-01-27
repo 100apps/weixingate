@@ -1,6 +1,8 @@
 <?php
-$wxkey="wxaaaaa5a5393b2c14";
-$wxsec="aaaaaaaaaaaaa00e1c3c5c7bba039289";
+session_start();
+
+$wxkey="wxaaaa05a5393b2c14";
+$wxsec="demosec16e97c00e1c3c5c7bba039289";
 
 header('Content-Type: application/javascript; charset=utf-8');
 
@@ -8,8 +10,6 @@ $user="";
 if(isset($_GET["return"])&&isset($_GET["code"])){
 	//微信返回。得到openid等信息。
 	$return=base64_decode($_GET["return"]);
-	$return.=strstr($return,"?")?"&":"?";
-	$return.="YUY_user=";
 
 	require_once "jssdk.php";
 	$jssdk=new JSSDK($wxkey,$wxsec);
@@ -22,7 +22,9 @@ if(isset($_GET["return"])&&isset($_GET["code"])){
 		}
 	}	
 
-	$return.=base64_encode(json_encode($user));
+	$_SESSION["YUY_user"]=$user;
+
+	#$return.=base64_encode(json_encode($user));
 	header("HTTP/1.1 301 Moved Permanently"); 
 	header("Location: ".$return); 
 	exit();
@@ -32,44 +34,41 @@ echo  	'YUY= window.hasOwnProperty("YUY")?window["YUY"]:{};';
 echo	'YUY.user=YUY.hasOwnProperty("user")?YUY["user"]:{};';
 
 //如果cookie里面已经有了。那么直接输出就是了。
-if(isset($_COOKIE["YUY_user"])){
+if(isset($_SESSION["YUY_user"])){
 	if(stristr($_SERVER['HTTP_USER_AGENT'],"micromessenger")&&isset($_GET["allUserInfo"])){
-		$alluserinfo=json_decode($_COOKIE["YUY_user"]);
+		$alluserinfo=($_SESSION["YUY_user"]);
 		if(isset($alluserinfo->nickname)){
-			$user=$_COOKIE["YUY_user"];
+			$user=json_encode($_SESSION["YUY_user"]);
 		}else if(isset($alluserinfo->openid)&&file_exists("openid/".$alluserinfo->openid)){
 			$user=file_get_contents("openid/".$alluserinfo->openid);
-			setcookie("YUY_user", $user, 2147483647);
+			$_SESSION["YUY_user"]=json_decode($user);
 		}
 	}else{
-		$user=$_COOKIE["YUY_user"];
+		$user=json_encode($_SESSION["YUY_user"]);
 	}
 }
+
 if(empty($user)){
 	if(stristr($_SERVER['HTTP_USER_AGENT'],"micromessenger")){
 		//微信中
 		$referer=empty($_SERVER['HTTP_REFERER'])?"":$_SERVER["HTTP_REFERER"];
-		parse_str(substr($referer,strpos($referer,"?")+1),$refererkv);	
-		if(isset($refererkv["YUY_user"])){
-			$user=base64_decode($refererkv["YUY_user"]);
-		}else if($referer){
-			//没有取得到。需要跳转获得。
 			$sdkUrl="http://service.houpix.com/wxsdk.js";
 			$type=isset($_GET["allUserInfo"])?"userinfo":"base";
 			echo "location.href=\"https://open.weixin.qq.com/connect/oauth2/authorize?appid=${wxkey}&redirect_uri=".urlencode($sdkUrl."?return=".base64_encode($referer))."&response_type=code&scope=snsapi_${type}&state=".$type.'";';
 			exit();	
-		}
 
 	}else{
 		//生成一个cookie就可以了。
-		$user="{'openid':'".uniqid()."'}";
+		$user=array("openid"=>uniqid());
 		
 	}
 	//设置cookie，方便下次直接调用。
-	setcookie("YUY_user", $user, 2147483647);
+	$_SESSION["YUY_user"]=$user;
+	$user=json_encode($user);	
 }
 
 if(empty($user))$user="{}";
+
 echo	"YUY.user=$user;";
 
 
